@@ -30,6 +30,7 @@ export const LabelGenerator: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [asnPreview, setAsnPreview] = useState<{ type: 'VDA4913' | 'DESADV', content: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
   const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -238,11 +239,14 @@ export const LabelGenerator: React.FC = () => {
         return;
       }
 
+      setExportProgress({ current: 0, total: labelElements.length });
+
       // Create single PDF with A4 landscape pages
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
-        format: 'a4'
+        format: 'a4',
+        compress: true
       });
 
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -252,17 +256,24 @@ export const LabelGenerator: React.FC = () => {
         const element = labelElements[i];
         if (!element) continue;
         
-        // Capture the label as high-quality image
+        setExportProgress({ current: i + 1, total: labelElements.length });
+        
+        // Small delay to allow UI update
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Capture the label as optimized image
         const canvas = await html2canvas(element, {
-          scale: 3,
+          scale: 2,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
           width: element.offsetWidth,
-          height: element.offsetHeight
+          height: element.offsetHeight,
+          removeContainer: true,
+          imageTimeout: 0
         });
         
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG with 92% quality for smaller size
         
         // Add new page for each label after the first
         if (i > 0) {
@@ -281,7 +292,7 @@ export const LabelGenerator: React.FC = () => {
         const x = (pageWidth - scaledWidth) / 2;
         const y = (pageHeight - scaledHeight) / 2;
         
-        pdf.addImage(imgData, 'PNG', x, y, scaledWidth, scaledHeight);
+        pdf.addImage(imgData, 'JPEG', x, y, scaledWidth, scaledHeight);
       }
       
       // Download the PDF
@@ -293,6 +304,7 @@ export const LabelGenerator: React.FC = () => {
       alert('PDF oluşturulurken hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsExporting(false);
+      setExportProgress({ current: 0, total: 0 });
     }
   };
 
@@ -380,10 +392,10 @@ export const LabelGenerator: React.FC = () => {
                   <button 
                     onClick={exportLabelsToPDF} 
                     disabled={isExporting}
-                    className="flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm disabled:bg-slate-400"
+                    className="flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm disabled:bg-slate-400 disabled:cursor-wait"
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    {isExporting ? 'PDF Oluşturuluyor...' : 'PDF İndir'}
+                    {isExporting ? `PDF Oluşturuluyor... (${exportProgress.current}/${exportProgress.total})` : 'PDF İndir'}
                   </button>
                   <button 
                     onClick={handlePrint} 
