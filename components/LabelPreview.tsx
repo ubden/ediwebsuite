@@ -54,19 +54,23 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
       <div className="flex h-[18%] border-b-2 border-black">
         <div className="w-[55%] border-r-2 border-black p-1 flex flex-col">
           <FieldHeader title="Lieferschein-Nr." code="N" />
-          <div className="flex items-center space-x-2">
-            <span className="text-xl font-bold font-mono">{data.deliveryNote}</span>
-            <div className="flex-1 overflow-hidden">
-               <Barcode {...barcodeConfig} value={`N${data.deliveryNote}`} height={30} width={1.2} />
+          <div className="flex items-center space-x-2 h-full">
+            <span className="text-xl font-bold font-mono z-10">{data.deliveryNote}</span>
+            <div className="flex-1 overflow-hidden relative h-[40px] flex items-center">
+               <div className="absolute top-0 left-0 transform origin-top-left scale-90">
+                 <Barcode {...barcodeConfig} value={`N${data.deliveryNote}`} height={35} width={1.2} />
+               </div>
             </div>
           </div>
         </div>
         <div className="w-[45%] p-1 flex flex-col">
           <FieldHeader title="Lieferanten-Nr." code="V" />
-          <div className="flex items-center space-x-2">
-            <span className="text-xl font-bold font-mono">{data.supplierId}</span>
-            <div className="flex-1 overflow-hidden">
-               <Barcode {...barcodeConfig} value={`V${data.supplierId}`} height={30} width={1.2} />
+          <div className="flex items-center space-x-2 h-full">
+            <span className="text-xl font-bold font-mono z-10">{data.supplierId}</span>
+            <div className="flex-1 overflow-hidden relative h-[40px] flex items-center">
+               <div className="absolute top-0 left-0 transform origin-top-left scale-90">
+                  <Barcode {...barcodeConfig} value={`V${data.supplierId}`} height={35} width={1.2} />
+               </div>
             </div>
           </div>
         </div>
@@ -78,10 +82,12 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
             <FieldHeader title="Sach-Nr. Kunde" code="P" />
             <span className="text-xs font-bold text-slate-500">{type === LabelType.VDA_4906 ? 'MASTER LABEL' : ''}</span>
          </div>
-         <div className="flex items-center">
-            <div className="text-5xl font-black tracking-tighter mr-4 font-vda">{data.partNo}</div>
-            <div className="flex-1 pt-2">
-               <Barcode {...barcodeConfig} value={`P${data.partNo}`} height={60} width={1.7} />
+         <div className="flex items-center h-full">
+            <div className="text-5xl font-black tracking-tighter mr-4 font-vda z-10 whitespace-nowrap">{data.partNo}</div>
+            <div className="flex-1 pt-2 relative h-[70px] overflow-hidden">
+               <div className="absolute top-0 left-0">
+                  <Barcode {...barcodeConfig} value={`P${data.partNo}`} height={60} width={1.7} />
+               </div>
             </div>
          </div>
       </div>
@@ -90,16 +96,16 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
       <div className="flex h-[15%] border-b-2 border-black">
          <div className="w-[30%] border-r-2 border-black p-1 flex flex-col">
             <FieldHeader title="Menge" code="Q" />
-            <div className="flex flex-col">
-               <span className="text-3xl font-bold">{data.quantity}</span>
-               <div className="overflow-hidden">
+            <div className="flex flex-col h-full relative">
+               <span className="text-3xl font-bold z-10">{data.quantity}</span>
+               <div className="overflow-hidden absolute bottom-0 w-full h-[35px]">
                  <Barcode {...barcodeConfig} value={`Q${data.quantity}`} height={30} width={1.2} />
                </div>
             </div>
          </div>
          <div className="w-[70%] p-2 flex flex-col">
             <FieldHeader title="Bezeichnung Lieferung" />
-            <div className="text-xl font-bold leading-6 mt-1">{data.description}</div>
+            <div className="text-xl font-bold leading-6 mt-1 line-clamp-2">{data.description}</div>
          </div>
       </div>
 
@@ -117,9 +123,11 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
           </div>
           <div className="w-[45%] p-1 flex flex-col">
              <FieldHeader title="Packstück-Nr." code="S" />
-             <div className="flex justify-between items-center">
-                <span className="text-lg font-bold">{data.serialNo}</span>
-                <Barcode {...barcodeConfig} value={`S${data.serialNo}`} height={35} width={1.2} />
+             <div className="flex justify-between items-center h-full relative">
+                <span className="text-lg font-bold z-10">{data.serialNo}</span>
+                <div className="absolute right-0 top-1 h-[40px] overflow-hidden flex items-center">
+                   <Barcode {...barcodeConfig} value={`S${data.serialNo}`} height={35} width={1.2} />
+                </div>
              </div>
           </div>
       </div>
@@ -128,9 +136,11 @@ export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
       <div className="flex h-[15%]">
          <div className="w-[55%] border-r-2 border-black p-1">
              <FieldHeader title="Chargen-Nr." code="H" />
-             <div className="flex items-center space-x-2">
-                <span className="text-lg font-bold">{data.batch}</span>
-                <Barcode {...barcodeConfig} value={`H${data.batch}`} height={30} width={1.2} />
+             <div className="flex items-center space-x-2 h-full relative">
+                <span className="text-lg font-bold z-10">{data.batch}</span>
+                <div className="absolute right-0 top-0 h-[40px] w-[180px] overflow-hidden">
+                   <Barcode {...barcodeConfig} value={`H${data.batch}`} height={35} width={1.2} />
+                </div>
              </div>
          </div>
          <div className="w-[20%] border-r-2 border-black p-1">
