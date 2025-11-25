@@ -252,48 +252,77 @@ export const LabelGenerator: React.FC = () => {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
+      // Store original display values
+      const originalDisplays = labelElements.map(el => el?.style.display || '');
+      
+      // Hide all labels initially
+      labelElements.forEach(el => {
+        if (el) el.style.display = 'none';
+      });
+      
       for (let i = 0; i < labelElements.length; i++) {
         const element = labelElements[i];
         if (!element) continue;
         
         setExportProgress({ current: i + 1, total: labelElements.length });
         
-        // Small delay to allow UI update
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Show only current label
+        element.style.display = 'block';
         
-        // Capture the label as optimized image
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          width: element.offsetWidth,
-          height: element.offsetHeight,
-          removeContainer: true,
-          imageTimeout: 0
-        });
+        // Wait for render
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-        const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG with 92% quality for smaller size
-        
-        // Add new page for each label after the first
-        if (i > 0) {
-          pdf.addPage();
+        try {
+          // Capture the label with minimal settings
+          const canvas = await html2canvas(element, {
+            scale: 1.5,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            allowTaint: false,
+            removeContainer: false,
+            imageTimeout: 5000,
+            onclone: (clonedDoc) => {
+              const clonedElement = clonedDoc.querySelector(`[data-label-index="${i}"]`);
+              if (clonedElement) {
+                (clonedElement as HTMLElement).style.display = 'block';
+              }
+            }
+          });
+          
+          // Hide current label again
+          element.style.display = 'none';
+          
+          const imgData = canvas.toDataURL('image/jpeg', 0.85);
+          
+          // Add new page for each label after the first
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          // Calculate dimensions to fit the page while maintaining aspect ratio
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+          const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+          
+          const scaledWidth = imgWidth * ratio * 0.95;
+          const scaledHeight = imgHeight * ratio * 0.95;
+          
+          // Center the image on the page
+          const x = (pageWidth - scaledWidth) / 2;
+          const y = (pageHeight - scaledHeight) / 2;
+          
+          pdf.addImage(imgData, 'JPEG', x, y, scaledWidth, scaledHeight);
+          
+        } catch (labelError) {
+          console.error(`Error processing label ${i + 1}:`, labelError);
         }
-        
-        // Calculate dimensions to fit the page while maintaining aspect ratio
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
-        
-        const scaledWidth = imgWidth * ratio * 0.95; // 95% to add some margin
-        const scaledHeight = imgHeight * ratio * 0.95;
-        
-        // Center the image on the page
-        const x = (pageWidth - scaledWidth) / 2;
-        const y = (pageHeight - scaledHeight) / 2;
-        
-        pdf.addImage(imgData, 'JPEG', x, y, scaledWidth, scaledHeight);
       }
+      
+      // Restore original display values
+      labelElements.forEach((el, idx) => {
+        if (el) el.style.display = originalDisplays[idx];
+      });
       
       // Download the PDF
       pdf.save(`Labels_${generatedShipment.deliveryNote}_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -617,6 +646,7 @@ export const LabelGenerator: React.FC = () => {
                             <div 
                               key={hu.id} 
                               ref={el => labelRefs.current[index] = el}
+                              data-label-index={index}
                               className="mb-8 print:mb-0 print:break-after-page shadow-2xl print:shadow-none"
                             >
                                 <LabelPreview data={labelData} type={LabelType.VDA_4902} />
