@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://www.ubden.com/ubden-logo.png" alt="Ubden Logo" width="150" />
+  <img src="https://www.ubden.com/logo.png" alt="Ubden Logo" width="150" />
   <h1>LogiTech VDA Suite</h1>
   <p>
     <strong>Otomotiv Sektörü İçin Kapsamlı VDA & EDI Çözümü</strong>
