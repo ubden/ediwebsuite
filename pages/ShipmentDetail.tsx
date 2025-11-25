@@ -7,7 +7,6 @@ import { ArrowLeft, Printer, FileText, Package, Calendar, Download, Eye, X } fro
 import { generateVDA4913, generateDESADV } from '../utils/generator';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import JSZip from 'jszip';
 
 export const ShipmentDetail: React.FC = () => {
   const { id } = useParams();
@@ -36,48 +35,64 @@ export const ShipmentDetail: React.FC = () => {
     setIsExporting(true);
     
     try {
-      const zip = new JSZip();
       const labelElements = labelRefs.current.filter(el => el !== null);
+      
+      if (labelElements.length === 0) {
+        alert('Etiket bulunamadı!');
+        setIsExporting(false);
+        return;
+      }
+
+      // Create single PDF with A4 landscape pages
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       
       for (let i = 0; i < labelElements.length; i++) {
         const element = labelElements[i];
         if (!element) continue;
         
-        // Capture the label as image
+        // Capture the label as high-quality image
         const canvas = await html2canvas(element, {
-          scale: 2,
+          scale: 3,
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          width: element.offsetWidth,
+          height: element.offsetHeight
         });
         
-        // Create PDF
         const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'mm',
-          format: [100, 150]
-        });
         
-        pdf.addImage(imgData, 'PNG', 0, 0, 150, 100);
+        // Add new page for each label after the first
+        if (i > 0) {
+          pdf.addPage();
+        }
         
-        // Add to ZIP
-        const pdfBlob = pdf.output('blob');
-        zip.file(`Label_${shipment.handlingUnits[i].serialNo}.pdf`, pdfBlob);
+        // Calculate dimensions to fit the page while maintaining aspect ratio
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+        
+        const scaledWidth = imgWidth * ratio * 0.95; // 95% to add some margin
+        const scaledHeight = imgHeight * ratio * 0.95;
+        
+        // Center the image on the page
+        const x = (pageWidth - scaledWidth) / 2;
+        const y = (pageHeight - scaledHeight) / 2;
+        
+        pdf.addImage(imgData, 'PNG', x, y, scaledWidth, scaledHeight);
       }
       
-      // Generate ZIP
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Labels_${shipment.deliveryNote}_${Date.now()}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Download the PDF
+      pdf.save(`Labels_${shipment.deliveryNote}_${new Date().toISOString().slice(0, 10)}.pdf`);
       
-      alert(`✓ ${labelElements.length} adet etiket PDF olarak indirildi!`);
+      alert(`✓ ${labelElements.length} sayfalık PDF indirildi!`);
     } catch (error) {
       console.error('PDF export error:', error);
       alert('PDF oluşturulurken hata oluştu. Lütfen tekrar deneyin.');
