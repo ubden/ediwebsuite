@@ -1,11 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { LabelType, SavedReceiver, SavedSupplier, SavedPart, Transporter, Shipment, ShipmentItem, HandlingUnit, Order } from '../types';
 import { LabelPreview } from '../components/LabelPreview';
 import { Input } from '../components/Input';
-import { Printer, Plus, Trash2, Package, FileText, Lock } from 'lucide-react';
+import { Printer, Plus, Trash2, Package, FileText, Lock, Download, Save, Eye, X } from 'lucide-react';
 import { generateVDA4913, generateDESADV } from '../utils/generator';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 
 export const LabelGenerator: React.FC = () => {
   const location = useLocation();
@@ -25,6 +28,10 @@ export const LabelGenerator: React.FC = () => {
   });
   const [items, setItems] = useState<ShipmentItem[]>([]);
   const [generatedShipment, setGeneratedShipment] = useState<Shipment | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [asnPreview, setAsnPreview] = useState<{ type: 'VDA4913' | 'DESADV', content: string } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
      // Load DB
@@ -196,11 +203,7 @@ export const LabelGenerator: React.FC = () => {
         };
 
         setGeneratedShipment(newShipment);
-        
-        // Save to Shipment History
-        const existingHistory = JSON.parse(localStorage.getItem('vda_shipments') || '[]');
-        localStorage.setItem('vda_shipments', JSON.stringify([...existingHistory, newShipment]));
-
+        setIsSaved(false); // Mark as not saved yet
         setStep('PREVIEW');
     } catch (error) {
         console.error("Error generating shipment:", error);
@@ -208,38 +211,114 @@ export const LabelGenerator: React.FC = () => {
     }
   };
 
+  const saveShipment = () => {
+    if (!generatedShipment || isSaved) return;
+    
+    // Save to Shipment History
+    const existingHistory = JSON.parse(localStorage.getItem('vda_shipments') || '[]');
+    localStorage.setItem('vda_shipments', JSON.stringify([...existingHistory, generatedShipment]));
+    setIsSaved(true);
+    alert('✓ Sevkiyat başarıyla kaydedildi!');
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
-  const downloadASN = (type: 'VDA4913' | 'DESADV') => {
+  const exportLabelsToPDF = async () => {
+    if (!generatedShipment) return;
+    
+    setIsExporting(true);
+    
+    try {
+      const zip = new JSZip();
+      const labelElements = labelRefs.current.filter(el => el !== null);
+      
+      for (let i = 0; i < labelElements.length; i++) {
+        const element = labelElements[i];
+        if (!element) continue;
+        
+        // Capture the label as image
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+        
+        // Create PDF
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: [100, 150] // Standard label size
+        });
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, 150, 100);
+        
+        // Add to ZIP
+        const pdfBlob = pdf.output('blob');
+        zip.file(`Label_${generatedShipment.handlingUnits[i].serialNo}.pdf`, pdfBlob);
+      }
+      
+      // Generate ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Labels_${generatedShipment.deliveryNote}_${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert(`✓ ${labelElements.length} adet etiket PDF olarak indirildi!`);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      alert('PDF oluşturulurken hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const previewASN = (type: 'VDA4913' | 'DESADV') => {
       if (!generatedShipment) return;
 
       const asnData = {
           deliveryNoteNumber: generatedShipment.deliveryNote,
           deliveryDate: generatedShipment.deliveryDate,
           supplierId: generatedShipment.supplierSnapshot.supplierCode,
-          customerId: generatedShipment.receiverSnapshot.dockCode, // Using Dock Code as ID mostly in VDA
-          transportMode: '10', // Truck
+          customerId: generatedShipment.receiverSnapshot.dockCode,
+          transportMode: '10',
           carrier: generatedShipment.transporterSnapshot.carrierCode,
           items: generatedShipment.items.map(i => ({
               id: i.id,
               partNumber: i.partNo,
               quantity: i.totalQuantity,
               orderNumber: i.customerOrderNo || '',
-              packageType: 'KLT' // Default
+              packageType: 'KLT'
           }))
       };
 
       const content = type === 'VDA4913' ? generateVDA4913(asnData) : generateDESADV(asnData);
-      const blob = new Blob([content], { type: 'text/plain' });
+      setAsnPreview({ type, content });
+  };
+
+  const downloadASN = () => {
+      if (!asnPreview || !generatedShipment) return;
+      
+      const blob = new Blob([asnPreview.content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = type === 'VDA4913' ? `VDA4913_${asnData.deliveryNoteNumber}.txt` : `DESADV_${asnData.deliveryNoteNumber}.edi`;
+      a.download = asnPreview.type === 'VDA4913' 
+          ? `VDA4913_${generatedShipment.deliveryNote}.txt` 
+          : `DESADV_${generatedShipment.deliveryNote}.edi`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setAsnPreview(null);
   };
 
   // --- Render Steps ---
@@ -268,10 +347,37 @@ export const LabelGenerator: React.FC = () => {
              </div>
              
              {step === 'PREVIEW' && (
-                <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm">
+                <>
+                  {!isSaved && (
+                    <button 
+                      onClick={saveShipment} 
+                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm font-medium"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Sevkiyatı Kaydet
+                    </button>
+                  )}
+                  {isSaved && (
+                    <span className="text-green-600 font-medium text-sm flex items-center">
+                      ✓ Kaydedildi
+                    </span>
+                  )}
+                  <button 
+                    onClick={exportLabelsToPDF} 
+                    disabled={isExporting}
+                    className="flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm disabled:bg-slate-400"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    {isExporting ? 'PDF Oluşturuluyor...' : 'Etiketleri PDF İndir'}
+                  </button>
+                  <button 
+                    onClick={handlePrint} 
+                    className="flex items-center px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 shadow-sm"
+                  >
                     <Printer className="w-4 h-4 mr-2" />
-                    Etiketleri Yazdır
-                </button>
+                    Hızlı Yazdır
+                  </button>
+                </>
              )}
         </div>
       </div>
@@ -441,13 +547,19 @@ export const LabelGenerator: React.FC = () => {
                         &larr; Düzenlemeye Dön
                     </button>
                     <div className="flex space-x-3">
-                         <button onClick={() => downloadASN('VDA4913')} className="flex items-center px-4 py-2 border border-slate-300 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50">
-                            <FileText className="w-4 h-4 mr-2" />
-                            VDA 4913 İndir
+                         <button 
+                            onClick={() => previewASN('VDA4913')} 
+                            className="flex items-center px-4 py-2 border border-slate-300 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50"
+                         >
+                            <Eye className="w-4 h-4 mr-2" />
+                            VDA 4913 Görüntüle
                          </button>
-                         <button onClick={() => downloadASN('DESADV')} className="flex items-center px-4 py-2 border border-slate-300 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50">
-                            <FileText className="w-4 h-4 mr-2" />
-                            EDIFACT ASN İndir
+                         <button 
+                            onClick={() => previewASN('DESADV')} 
+                            className="flex items-center px-4 py-2 border border-slate-300 bg-white text-slate-700 font-medium rounded-lg hover:bg-slate-50"
+                         >
+                            <Eye className="w-4 h-4 mr-2" />
+                            EDIFACT ASN Görüntüle
                          </button>
                     </div>
                 </div>
@@ -475,7 +587,11 @@ export const LabelGenerator: React.FC = () => {
                         };
 
                         return (
-                            <div key={hu.id} className="mb-8 print:mb-0 print:break-after-page shadow-2xl print:shadow-none">
+                            <div 
+                              key={hu.id} 
+                              ref={el => labelRefs.current[index] = el}
+                              className="mb-8 print:mb-0 print:break-after-page shadow-2xl print:shadow-none"
+                            >
                                 <LabelPreview data={labelData} type={LabelType.VDA_4902} />
                                 <div className="text-center mt-2 text-xs text-slate-500 font-mono no-print">
                                     Etiket {index + 1} / {generatedShipment.handlingUnits.length} - Seri: {hu.serialNo}
@@ -487,6 +603,59 @@ export const LabelGenerator: React.FC = () => {
             </div>
         )}
       </div>
+
+      {/* ASN Preview Modal */}
+      {asnPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center">
+                <FileText className="w-5 h-5 mr-2 text-brand-600" />
+                {asnPreview.type === 'VDA4913' ? 'VDA 4913' : 'EDIFACT DESADV'} Önizleme
+              </h3>
+              <button 
+                onClick={() => setAsnPreview(null)} 
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-1 overflow-auto p-6">
+              <pre className="bg-slate-50 p-4 rounded-lg text-xs font-mono overflow-x-auto border border-slate-200">
+                {asnPreview.content}
+              </pre>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="p-6 border-t bg-slate-50 flex justify-between items-center">
+              <div className="text-sm text-slate-600">
+                {asnPreview.content.split('\n').length} satır
+              </div>
+              <div className="flex space-x-3">
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(asnPreview.content);
+                    alert('✓ Panoya kopyalandı!');
+                  }}
+                  className="px-4 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg hover:bg-slate-50"
+                >
+                  Panoya Kopyala
+                </button>
+                <button 
+                  onClick={downloadASN}
+                  className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  İndir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
