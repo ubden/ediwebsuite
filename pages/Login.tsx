@@ -13,7 +13,7 @@ export const Login: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate login
-    login(email, 'Ahmet Yılmaz');
+    login(email, 'Can KURT');
     navigate('/');
   };
 

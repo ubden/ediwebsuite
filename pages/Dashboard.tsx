@@ -33,7 +33,7 @@ export const Dashboard: React.FC = () => {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-brand-700 to-brand-500 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold mb-2">Hoşgeldiniz, Ahmet Bey</h1>
+          <h1 className="text-3xl font-bold mb-2">Hoşgeldiniz, Can Bey</h1>
           <p className="text-brand-100 max-w-xl">
             VDA standartlarında etiketleme, ASN ve Sipariş yönetim işlemlerinizi tek bir noktadan yönetin.
           </p>

@@ -31,12 +31,18 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-4 border-t border-slate-800">
-        <div className="bg-slate-800 rounded-lg p-4">
+        <div className="bg-slate-800 rounded-lg p-4 mb-4">
           <h4 className="text-xs font-semibold text-slate-400 uppercase">Sistem Durumu</h4>
           <div className="mt-2 flex items-center">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
             <span className="text-xs text-slate-300">VDA Servisleri Aktif</span>
           </div>
+        </div>
+        
+        <div className="text-center">
+            <a href="https://www.ubden.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-slate-500 hover:text-slate-400 transition-colors">
+                powered by Ubden®
+            </a>
         </div>
       </div>
     </aside>
