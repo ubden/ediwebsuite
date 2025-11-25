@@ -112,8 +112,14 @@ export const LabelGenerator: React.FC = () => {
     console.log("Generating shipment...", header, items);
     
     // 1. Validation
-    if (!header.supplierId || !header.receiverId || !header.deliveryNote) {
-        alert("Lütfen başlık bilgilerini eksiksiz doldurun.");
+    const missingFields = [];
+    if (!header.supplierId || header.supplierId.trim() === '') missingFields.push("Tedarikçi");
+    if (!header.receiverId || header.receiverId.trim() === '') missingFields.push("Müşteri");
+    if (!header.deliveryNote || header.deliveryNote.trim() === '') missingFields.push("İrsaliye No");
+    if (!header.deliveryDate || header.deliveryDate.trim() === '') missingFields.push("Sevk Tarihi");
+    
+    if (missingFields.length > 0) {
+        alert(`Lütfen şu alanları doldurunuz: ${missingFields.join(", ")}`);
         return;
     }
     if (items.length === 0) {
