@@ -58,47 +58,40 @@ export const ShipmentDetail: React.FC = () => {
       const pageHeight = pdf.internal.pageSize.getHeight();
       
       // Store original display values
-      const originalDisplays = labelElements.map(el => el?.style.display || '');
+      const originalDisplays = labelElements.map(el => el?.parentElement?.style.display || '');
       
-      // Hide all labels initially
+      // Hide all parent containers initially to reduce reflow
       labelElements.forEach(el => {
-        if (el) el.style.display = 'none';
+        if (el && el.parentElement) el.parentElement.style.display = 'none';
       });
       
       for (let i = 0; i < labelElements.length; i++) {
         const element = labelElements[i];
-        if (!element) continue;
+        if (!element || !element.parentElement) continue;
         
         setExportProgress({ current: i + 1, total: labelElements.length });
         
-        // Show only current label
-        element.style.display = 'block';
-        
-        // Wait for render
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Show parent container for current label
+        element.parentElement.style.display = 'inline-block';
         
         try {
-          // Capture the label with minimal settings
+          // Capture the label with optimized settings
           const canvas = await html2canvas(element, {
             scale: 1.5,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
-            allowTaint: false,
-            removeContainer: false,
-            imageTimeout: 5000,
-            onclone: (clonedDoc) => {
-              const clonedElement = clonedDoc.querySelector(`[data-label-index="${i}"]`);
-              if (clonedElement) {
-                (clonedElement as HTMLElement).style.display = 'block';
-              }
-            }
+            allowTaint: true, // Changed to true for better performance with local images
+            removeContainer: true,
+            imageTimeout: 2000, // Reduced timeout
+            windowWidth: element.offsetWidth,
+            windowHeight: element.offsetHeight
           });
           
-          // Hide current label again
-          element.style.display = 'none';
+          // Hide parent again
+          element.parentElement.style.display = 'none';
           
-          const imgData = canvas.toDataURL('image/jpeg', 0.85);
+          const imgData = canvas.toDataURL('image/jpeg', 0.8); // Reduced quality slightly for speed
           
           // Add new page for each label after the first
           if (i > 0) {
@@ -122,11 +115,14 @@ export const ShipmentDetail: React.FC = () => {
         } catch (labelError) {
           console.error(`Error processing label ${i + 1}:`, labelError);
         }
+        
+        // Give UI thread a breather every 5 labels
+        if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
       }
       
       // Restore original display values
       labelElements.forEach((el, idx) => {
-        if (el) el.style.display = originalDisplays[idx];
+        if (el && el.parentElement) el.parentElement.style.display = originalDisplays[idx];
       });
       
       // Download the PDF
@@ -273,11 +269,12 @@ export const ShipmentDetail: React.FC = () => {
                     return (
                         <div 
                           key={hu.id} 
-                          ref={el => labelRefs.current[index] = el}
                           data-label-index={index}
-                          className="mb-8 print:mb-0 print:break-after-page shadow-2xl print:shadow-none"
+                          className="mb-8 print:mb-0 print:break-after-page shadow-2xl print:shadow-none inline-block"
                         >
-                            <LabelPreview data={labelData} type={LabelType.VDA_4902} />
+                            <div ref={el => labelRefs.current[index] = el} className="bg-white">
+                                <LabelPreview data={labelData} type={LabelType.VDA_4902} />
+                            </div>
                             <div className="text-center mt-2 text-xs text-slate-500 font-mono no-print">
                                 Etiket {index + 1} / {shipment.handlingUnits.length}
                             </div>

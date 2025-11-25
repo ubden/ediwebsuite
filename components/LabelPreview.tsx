@@ -22,7 +22,8 @@ const barcodeConfig = {
   fontSize: 12,
   margin: 0,
   displayValue: false, // We usually print value manually in VDA to control formatting
-  format: "CODE39" as const
+  format: "CODE39" as const,
+  renderer: "img" as const
 };
 
 export const LabelPreview: React.FC<LabelPreviewProps> = ({ data, type }) => {
